@@ -3,10 +3,20 @@
 # commit messages too. The pattern is built via printf octal escapes (UTF-8
 # bytes of the en and em dash) so this file itself stays free of them.
 
+# Only the message that will actually land is scanned: git strips comment
+# lines ("#") and everything below the scissors line (the `git commit -v`
+# diff) AFTER this hook runs, so scanning the raw file would reject clean
+# commits over a dash in a template comment, a "# Conflicts:" path, or a
+# removed line of the diff.
+# Known trade-off (assumes the default core.commentChar "#"): under
+# `git commit -m` git KEEPS "#" lines, so a dash on such a line escapes this
+# hook; CI still catches it in any committed file.
+msg=$(sed -n '/^# ------------------------ >8 ------------------------$/q;p' "$1" | grep -v '^#')
+
 # -E (extended regex) so the plain "|" alternation is portable: GNU grep AND
 # the BSD grep shipped on macOS. Basic-regex "\|" is a GNU-only extension that
 # BSD grep treats literally, which would silently pass dashes on a Mac.
-if grep -nE "$(printf '\342\200\223|\342\200\224')" "$1"; then
+if printf '%s\n' "$msg" | grep -nE "$(printf '\342\200\223|\342\200\224')"; then
   echo "" >&2
   echo "commit-msg: the message contains an em or en dash (lines above)." >&2
   echo "House style bans them everywhere; use a comma, colon, or parentheses (see AGENTS.md)." >&2
