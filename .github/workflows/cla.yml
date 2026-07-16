@@ -1,0 +1,104 @@
+# CLA enforcement for Q-Summit/q-app.
+#
+# How it works: on their first pull request, a contributor is asked by the bot
+# to comment the sign phrase. The bot records them in cla/signatures.json on the
+# main branch and turns the PR check green. Later PRs pass automatically.
+# EVERYONE signs, including maintainers. No human is ever exempt.
+#
+# About the ONE bypass entry (read this, it is not a loophole):
+#   Signatures are stored on main, so the record is durable and versioned with
+#   the code. Because main requires pull requests, the bot needs permission to
+#   commit the signatures file to main directly. So github-actions[bot] is the
+#   ONLY entry on main's "bypass required pull requests" list. That lets the BOT
+#   write the signature ledger. It does NOT let any human merge without a PR, and
+#   it does NOT let anyone skip signing: every human is still gated by the
+#   required "CLA Assistant" check on every pull request.
+#
+# There are two separate lists; do not confuse them:
+#   - CLA allowlist (below): who may skip SIGNING. Bots only. No human, ever.
+#   - Branch bypass: who may push to main without a PR. Only github-actions[bot].
+#
+# REQUIRED one-time GitHub settings (Repository Settings):
+#   1. Actions > General > Workflow permissions: keep the default at "Read
+#      repository contents and packages permissions" (read-only). This workflow
+#      does NOT rely on the repo-wide default; it declares its own permissions
+#      block below, which still grants the writes the bot needs. Leaving the
+#      default read-only means checks.yml and any future workflow get a
+#      least-privilege token unless they opt into more on purpose.
+#   2. Branches > rule for main:
+#        - Require a pull request before merging.
+#        - Require status checks to pass, and add the "CLA Assistant" check
+#          (this is what blocks merging an unsigned PR).
+#        - Allow specified actors to bypass required pull requests: add ONLY
+#          github-actions[bot]. No human.
+#        - Do NOT enable "Require signed commits" (the bot's commits are unsigned
+#          and would be rejected).
+#   3. Any push-triggered workflow on main should set paths-ignore: ['cla/**']
+#      so recording a signature never triggers a build.
+
+name: CLA Assistant
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_target:
+    types: [opened, synchronize]
+
+permissions:
+  actions: write
+  contents: write
+  pull-requests: write
+  statuses: write
+
+# Serialize signature-ledger writes. Two quick sign/recheck comments could
+# otherwise race two commits to cla/signatures.json on main and conflict or lose
+# an update. Never cancel-in-progress here: a half-finished ledger write must
+# complete, not be interrupted.
+concurrency:
+  group: cla-signatures
+  cancel-in-progress: false
+
+jobs:
+  cla:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CLA Assistant
+        if: >-
+          (github.event_name == 'issue_comment' &&
+            (github.event.comment.body == 'recheck' ||
+             github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
+          github.event_name == 'pull_request_target'
+        # Pinned to a full commit SHA rather than a mutable tag because this
+        # job runs with contents:write in a pull_request_target context. Update
+        # the SHA and the trailing comment together when bumping versions.
+        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Signatures are stored on the main branch, in cla/signatures.json, so
+          # the record is durable and versioned with the code and cannot be lost
+          # by deleting a branch. Created automatically on the first signature; do
+          # not create it by hand. See the header for the one bot bypass this needs.
+          path-to-signatures: "cla/signatures.json"
+          branch: "main"
+          # The document contributors agree to.
+          path-to-document: "https://github.com/Q-Summit/q-app/blob/main/CLA.md"
+          # Who may skip SIGNING: only automated bot accounts, which cannot post
+          # the signing comment. `*[bot]` matches every GitHub App account
+          # (brackets are illegal in human usernames). Never add a human here, so
+          # every maintainer and contributor signs.
+          allowlist: "*[bot]"
+          custom-notsigned-prcomment: |
+            Thank you for your contribution.
+
+            Before we can merge this, you need to sign our
+            [Contributor License Agreement (CLA)](https://github.com/Q-Summit/q-app/blob/main/CLA.md).
+            You keep the copyright to your work; signing lets Q-Summit keep the
+            app free for non-profits while offering commercial licenses. This
+            is a one-time step.
+
+            **To sign, reply to this PR with exactly:**
+          custom-pr-sign-comment: "I have read the CLA Document and I hereby sign the CLA"
+          custom-allsigned-prcomment: |
+            All contributors have signed the CLA. Thank you.
+          lock-pullrequest-aftermerge: false

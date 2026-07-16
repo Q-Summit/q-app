@@ -1,0 +1,48 @@
+name: Links
+
+# Weekly health check for external links in the markdown. Internal relative
+# links are validated on every PR (`pnpm run check`, scripts/validate-docs.mjs);
+# external links rot on the web's schedule, not ours, so this runs weekly and
+# files an issue instead of blocking PRs. Tuning lives in lychee.toml.
+on:
+  schedule:
+    # Mondays 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+# A manual run supersedes a scheduled one that is still going.
+concurrency:
+  group: links
+  cancel-in-progress: true
+
+jobs:
+  lychee:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to full commit SHAs (house rule for workflows, see cla.yml).
+      # Update the SHA and the trailing version comment together.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        id: lychee
+        with:
+          args: --config lychee.toml --no-progress './**/*.md'
+          # Failure is reported as an issue below, not as a red workflow run.
+          fail: false
+        env:
+          # Authenticated requests get higher rate limits on the many
+          # github.com links.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: File an issue with the report
+        if: steps.lychee.outputs.exit_code != 0
+        uses: peter-evans/create-issue-from-file@fca9117c27cdc29c6c4db3b86c48e4115a786710 # v6.0.0
+        with:
+          title: "Link check: broken external links"
+          content-filepath: ./lychee/out.md
+          # Only labels from scripts/setup-labels.sh exist; bug is the fit.
+          labels: bug
