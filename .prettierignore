@@ -1,0 +1,17 @@
+node_modules
+pnpm-lock.yaml
+
+# Owned by tooling/other agents: never restyle.
+.agents
+.claude
+AGENTS.md
+CLAUDE.md
+
+# Legal files stay byte-for-byte as drafted: never reformat.
+LICENSE.md
+COMMERCIAL.md
+CLA.md
+NOTICE
+
+# GitHub issue-form YAML is whitespace-sensitive; leave it to GitHub.
+.github/ISSUE_TEMPLATE

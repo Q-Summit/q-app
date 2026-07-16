@@ -1,0 +1,34 @@
+{
+  "name": "q-app",
+  "version": "0.0.0",
+  "private": true,
+  "license": "SEE LICENSE.md",
+  "type": "module",
+  "description": "Q-Summit Conference App: docs-first repo tooling.",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
+  "scripts": {
+    "setup": "pnpm install && node scripts/setup.mjs",
+    "check": "node scripts/validate-docs.mjs && markdownlint-cli2 && cspell --no-progress --cache --cache-location node_modules/.cache/cspell/.cspellcache . && prettier --check \"**/*.{md,json,yml,yaml}\"",
+    "check:docs": "node scripts/validate-docs.mjs",
+    "check:md": "markdownlint-cli2",
+    "check:spell": "cspell --no-progress --cache --cache-location node_modules/.cache/cspell/.cspellcache .",
+    "format": "prettier --write \"**/*.{md,json,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{md,json,yml,yaml}\"",
+    "hooks:install": "git config core.hooksPath .githooks"
+  },
+  "devDependencies": {
+    "cspell": "^10.0.1",
+    "gray-matter": "^4.0.3",
+    "markdownlint-cli2": "^0.23.0",
+    "mdast-util-to-string": "^4.0.0",
+    "prettier": "^3.9.5",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
+  },
+  "packageManager": "pnpm@10.32.0+sha512.9b2634bb3fed5601c33633f2d92593f506270a3963b8c51d2b2d6a828da615ce4e9deebef9614ccebbc13ac8d3c0f9c9ccceb583c69c8578436fa477dbb20d70"
+}
