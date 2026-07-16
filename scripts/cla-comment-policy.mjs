@@ -6,8 +6,9 @@
  * signed, but (b) rewrites any prior bot comment into an "all signed"
  * celebration, and (c) only @-mentions unsigned committers when there are 2+.
  *
- * This script enforces Q-Summit policy: silence on success; @-ping each missing
- * human on failure. Invoked from .github/workflows/cla.yml after the action.
+ * Policy: silence on success; on failure, @-ping each missing GitHub user and
+ * list unlinked git authors (no @, names in backticks). Best-effort only: never
+ * fail the workflow after CLA itself has already decided (see cla.yml).
  *
  * Required env: GITHUB_TOKEN, CLA_OUTCOME, PR_NUMBER, GITHUB_REPOSITORY
  * Optional env: PATH_TO_DOCUMENT, SIGN_PHRASE, COMMENT_MARKER
@@ -82,16 +83,36 @@ function isOurs(body) {
   );
 }
 
-function commentBody(unsigned) {
-  const mentions = unsigned.map((login) => `@${login}`).join(" ");
-  return [
-    `${mentions}: please sign the CLA before this can merge.`,
-    "",
+/** Neutralize markdown in contributor-controlled git author names. */
+function escapeUserText(s) {
+  return "`" + String(s ?? "").replace(/`/g, "") + "`";
+}
+
+function commentBody(unsignedLogins, unresolvedNames) {
+  const lines = [];
+  if (unsignedLogins.length > 0) {
+    lines.push(
+      `${unsignedLogins.map((l) => `@${l}`).join(" ")}: please sign the CLA before this can merge.`,
+      "",
+    );
+  }
+  lines.push(
     "Before we can merge, every human committer must sign our",
     `[Contributor License Agreement (CLA)](${doc}).`,
     "You keep the copyright; signing lets Q-Summit keep the app free for",
     "non-profits while offering commercial licenses. One-time step.",
     "",
+  );
+  if (unresolvedNames.length > 0) {
+    const seem = unresolvedNames.length > 1 ? "seem" : "seems";
+    const names = unresolvedNames.map(escapeUserText).join(", ");
+    lines.push(
+      `**${names}** ${seem} not to be a GitHub user.`,
+      "You need a GitHub account to sign the CLA. If you already have one, [add the email used for these commits to your account](https://docs.github.com/en/account-and-profile/how-tos/email-settings/adding-an-email-address-to-your-github-account).",
+      "",
+    );
+  }
+  lines.push(
     "**Reply with exactly:**",
     "- - -",
     phrase,
@@ -99,7 +120,33 @@ function commentBody(unsigned) {
     "<sub>You can retrigger this bot by commenting **recheck** in this Pull Request.</sub>",
     "<sub>Posted by the **Self-Hosted CLA Assistant bot**.</sub>",
     marker,
-  ].join("\n");
+  );
+  return lines.join("\n");
+}
+
+async function deleteOurs(ours) {
+  for (const c of ours) {
+    await api(`/repos/${repo}/issues/comments/${c.id}`, { method: "DELETE" });
+  }
+}
+
+async function upsertComment(ours, body) {
+  if (ours.length > 0) {
+    const [primary, ...dupes] = ours;
+    await api(`/repos/${repo}/issues/comments/${primary.id}`, {
+      method: "PATCH",
+      body: { body },
+    });
+    for (const c of dupes) {
+      await api(`/repos/${repo}/issues/comments/${c.id}`, { method: "DELETE" });
+    }
+    return "updated";
+  }
+  await api(`/repos/${repo}/issues/${pr}/comments`, {
+    method: "POST",
+    body: { body },
+  });
+  return "created";
 }
 
 try {
@@ -107,21 +154,35 @@ try {
   const ours = comments.filter((c) => isOurs(c.body));
 
   if (outcome === "success") {
-    for (const c of ours) {
-      await api(`/repos/${repo}/issues/comments/${c.id}`, { method: "DELETE" });
+    try {
+      await deleteOurs(ours);
+      console.log(`removed ${ours.length} all-signed CLA comment(s)`);
+    } catch (err) {
+      // Best-effort: a green CLA must not be overturned by comment cleanup.
+      console.error("failed to delete all-signed CLA comment(s):", err);
     }
-    console.log(`removed ${ours.length} all-signed CLA comment(s)`);
     process.exit(0);
   }
 
   const commits = await apiPaginate(`/repos/${repo}/pulls/${pr}/commits`);
   const logins = [];
-  const seen = new Set();
+  const seenLogins = new Set();
+  const unresolvedNames = [];
+  const seenNames = new Set();
+
   for (const commit of commits) {
     const login = commit.author?.login;
-    if (!login || login.endsWith("[bot]") || seen.has(login)) continue;
-    seen.add(login);
-    logins.push(login);
+    if (login) {
+      if (login.endsWith("[bot]") || seenLogins.has(login)) continue;
+      seenLogins.add(login);
+      logins.push(login);
+      continue;
+    }
+    // No linked GitHub user: keep the raw git author name (upstream CLA does the same).
+    const name = commit.commit?.author?.name?.trim();
+    if (!name || seenNames.has(name)) continue;
+    seenNames.add(name);
+    unresolvedNames.push(name);
   }
 
   const sigMeta = await api(
@@ -135,39 +196,35 @@ try {
     (sig.signedContributors ?? []).map((e) => e.name).filter(Boolean),
   );
 
-  const unsigned = [];
+  const unsignedLogins = [];
   for (const login of logins) {
     const user = await api(`/users/${encodeURIComponent(login)}`);
     if (signedIds.has(user.id) || signedNames.has(login)) continue;
-    unsigned.push(login);
+    unsignedLogins.push(login);
   }
 
-  if (unsigned.length === 0) {
+  if (unsignedLogins.length === 0 && unresolvedNames.length === 0) {
     console.log(
       "CLA failed without resolvable unsigned humans; leaving comments",
     );
     process.exit(0);
   }
 
-  const body = commentBody(unsigned);
-  if (ours.length > 0) {
-    const [primary, ...dupes] = ours;
-    await api(`/repos/${repo}/issues/comments/${primary.id}`, {
-      method: "PATCH",
-      body: { body },
-    });
-    for (const c of dupes) {
-      await api(`/repos/${repo}/issues/comments/${c.id}`, { method: "DELETE" });
-    }
-    console.log(`updated CLA ping for: ${unsigned.join(", ")}`);
-  } else {
-    await api(`/repos/${repo}/issues/${pr}/comments`, {
-      method: "POST",
-      body: { body },
-    });
-    console.log(`created CLA ping for: ${unsigned.join(", ")}`);
+  const body = commentBody(unsignedLogins, unresolvedNames);
+  try {
+    const action = await upsertComment(ours, body);
+    const who = [
+      ...unsignedLogins,
+      ...unresolvedNames.map((n) => `(unlinked: ${n})`),
+    ].join(", ");
+    console.log(`${action} CLA ping for: ${who}`);
+  } catch (err) {
+    // Best-effort: CLA must pass already fails the job when signatures are missing.
+    console.error("failed to write CLA ping comment:", err);
   }
+  process.exit(0);
 } catch (err) {
+  // Never fail the job for comment policy; signing status is owned by CLA Assistant.
   console.error(err);
-  process.exit(1);
+  process.exit(0);
 }

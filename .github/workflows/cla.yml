@@ -21,9 +21,10 @@
 #     unrelated to CLA signing.
 #
 # Comment policy (scripts/cla-comment-policy.mjs): stay silent when everyone
-# has already signed; when someone is missing, @-mention them. Upstream CLA
-# Assistant always rewrites an "all signed" comment, so we delete that on
-# success. No in-progress or celebration comments.
+# has already signed; when someone is missing, @-mention linked GitHub users
+# and list unlinked git authors. Best-effort only (continue-on-error): never
+# overturn a green CLA for a comment API blip. No in-progress or celebration
+# comments.
 #
 # Secrets (Repository Settings > Secrets and variables > Actions):
 #   - CLA_APP_ID: numeric App ID of q-app-cla
@@ -143,7 +144,10 @@ jobs:
           persist-credentials: false
 
       - name: CLA comment policy
+        # Best-effort comment hygiene only. A green CLA must never be blocked by
+        # a transient API error while deleting or rewriting PR comments.
         if: always() && steps.cla.outcome != 'skipped'
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           CLA_OUTCOME: ${{ steps.cla.outcome }}
