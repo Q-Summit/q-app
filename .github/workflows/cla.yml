@@ -71,7 +71,8 @@ jobs:
         # Pinned to a full commit SHA rather than a mutable tag because this
         # job runs with contents:write in a pull_request_target context. Update
         # the SHA and the trailing comment together when bumping versions.
-        uses: contributor-assistant/github-action@ca4a40a7d1004f18d9960b404b97e5f30a505a08 # v2.6.1
+        # Maintained fork of the archived contributor-assistant/github-action.
+        uses: badideasforsale/cla-github-action@38936d31c921b8e536f5b786ea57c537b7cf297c # main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -79,6 +80,7 @@ jobs:
           # the record is durable and versioned with the code and cannot be lost
           # by deleting a branch. Created automatically on the first signature; do
           # not create it by hand. See the header for the one bot bypass this needs.
+          # path-to-signatures and branch are set explicitly (v3 defaults differ).
           path-to-signatures: "cla/signatures.json"
           branch: "main"
           # The document contributors agree to.
