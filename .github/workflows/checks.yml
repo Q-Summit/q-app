@@ -45,4 +45,18 @@ jobs:
           node-version-file: ".nvmrc"
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # The CLA bot alone appends to cla/signatures.json on main. Human PRs that
+      # touch it (including accidental prettier rewrites) race those commits and
+      # produce endless merge conflicts: fail fast instead.
+      - name: CLA ledger is bot-only
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin "$BASE_SHA"
+          if git diff --name-only "$BASE_SHA" HEAD | grep -qx 'cla/signatures.json'; then
+            echo '::error::Do not change cla/signatures.json in a PR. The CLA bot owns that file on main; drop it from the branch.'
+            exit 1
+          fi
       - run: pnpm run check
