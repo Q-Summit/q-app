@@ -1,0 +1,25 @@
+# Review ownership. Currently a single owner; once the org teams exist
+# (Settings > Teams), switch the default to @q-summit/it-team and the gated
+# paths to @q-summit/maintainers.
+#
+# Model: proposals (sketches, code) are team-wide; durable truth (decisions,
+# architecture, this governance) has a stricter gate.
+
+# Default: any IT team member can review.
+*                       @LukasStrickler
+
+# Durable truth: requires a maintainer's review.
+/docs/decisions/        @LukasStrickler
+/docs/architecture/     @LukasStrickler
+
+# Governance and automation: requires a maintainer's review.
+/.github/               @LukasStrickler
+/LICENSE.md             @LukasStrickler
+/COMMERCIAL.md          @LukasStrickler
+/CLA.md                 @LukasStrickler
+/NOTICE                 @LukasStrickler
+/PRIVACY.md             @LukasStrickler
+/SECURITY.md            @LukasStrickler
+/CODE_OF_CONDUCT.md     @LukasStrickler
+/CONTRIBUTING.md        @LukasStrickler
+/README.md              @LukasStrickler

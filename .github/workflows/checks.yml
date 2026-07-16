@@ -1,0 +1,48 @@
+name: Checks
+
+# Runs the same suite as the local git hooks: `pnpm run check` is the docs
+# validator plus markdownlint plus cspell plus prettier's format check. No paths filter:
+# the validator also covers root guides, .github/, scripts/, and the configs,
+# and an unfiltered workflow is safe to make a required status check.
+on:
+  pull_request:
+  push:
+    branches: [main]
+    # Signature commits from the CLA bot never need a check run (see cla.yml).
+    paths-ignore:
+      - "cla/**"
+
+# Least privilege: this job only reads the repo. The repo-wide default should be
+# read-only (see cla.yml header); this block makes the intent explicit and holds
+# even if that default is ever loosened.
+permissions:
+  contents: read
+
+# One in-flight run per ref: a new push to a PR cancels the superseded run.
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Checks
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to full commit SHAs (house rule for workflows, see cla.yml).
+      # Update the SHA and the trailing version comment together.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # The job only reads the tree; never leave the token on disk.
+          persist-credentials: false
+      # Installs the exact pnpm pinned in package.json's `packageManager` field,
+      # so CI and contributors always run the same version. Must run before
+      # setup-node so the pnpm store cache can be wired up.
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          # Single source of truth for the Node version: .nvmrc (also what
+          # contributors' version managers read). Keep it in step with engines.
+          node-version-file: ".nvmrc"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check

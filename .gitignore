@@ -1,0 +1,6 @@
+node_modules/
+
+# Local, per-machine state. Never commit personal tool settings.
+.claude/settings.local.json
+.DS_Store
+Thumbs.db

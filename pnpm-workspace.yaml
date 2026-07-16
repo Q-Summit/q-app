@@ -1,0 +1,8 @@
+# pnpm reads repo-wide settings from this file (pnpm 10+). No `packages:` list
+# yet: workspace packages only arrive with an accepted ADR (see AGENTS.md).
+
+# Supply-chain defaults. Dependencies never run install scripts unless
+# explicitly allowlisted here, and new releases must be at least 3 days old
+# before pnpm will resolve to them (mitigates freshly published malware).
+onlyBuiltDependencies: []
+minimumReleaseAge: 4320

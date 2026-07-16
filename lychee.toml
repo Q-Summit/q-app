@@ -1,0 +1,24 @@
+# External link health for the markdown. Internal relative links are already
+# validated on every PR by scripts/validate-docs.mjs; lychee only checks
+# http(s) links, weekly (.github/workflows/links.yml), so external rot never
+# blocks a PR.
+
+# http(s) only: relative file links are the docs validator's job.
+scheme = ["https", "http"]
+
+max_retries = 3
+max_concurrency = 8
+timeout = 20
+
+# 429 means "slow down", not link rot; 2xx is healthy.
+accept = ["200..=204", "429"]
+
+# Obvious fake sample data (house style, see AGENTS.md) is not meant to resolve.
+exclude = ["example\\.com", "example\\.org"]
+
+# Never probe private/internal addresses from CI.
+exclude_all_private = true
+
+# Dependency readmes are not our links to keep healthy (matters for local
+# runs; CI checks out a clean tree anyway).
+exclude_path = ["node_modules"]

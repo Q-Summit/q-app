@@ -1,0 +1,39 @@
+# Spell check for the docs-as-code repo: prose is the product, so typos are
+# defects. Runs as `pnpm run check:spell` (part of `pnpm run check`).
+# Unknown real words go into the project dictionary below, sorted.
+version: "0.2"
+language: en
+files:
+  - "**/*.md"
+  - "**/*.{json,jsonc,yml,yaml}"
+  - "scripts/**"
+  - ".githooks/**"
+ignorePaths:
+  # Dependency and lock churn.
+  - node_modules
+  - pnpm-lock.yaml
+  # Legal text stays byte-for-byte as drafted (see .prettierignore); flagging
+  # words we are not allowed to fix is pure noise.
+  - LICENSE.md
+  - COMMERCIAL.md
+  - CLA.md
+  - NOTICE
+  # Symlink into .agents (checked via its real path).
+  - .claude/skills
+useGitignore: true
+words:
+  - adrs
+  - blockquotes
+  - cooldown
+  - Diátaxis
+  - frontmatter
+  - rels
+  - Strickler
+  - Volere
+  - vulns
+  - zizmor
+overrides:
+  # GitHub label colors are 6-digit hex codes, not words.
+  - filename: scripts/setup-labels.sh
+    ignoreRegExpList:
+      - /\b[0-9a-f]{6}\b/
