@@ -1,0 +1,41 @@
+name: "🐛 Bug report"
+description: "Something in the platform doesn't work as documented or expected."
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Surface
+      options:
+        - Attendee app
+        - Partner platform
+        - Organizer tools
+        - API / backend
+        - Docs / repo
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How can we reproduce it?
+      placeholder: |
+        1. Open ...
+        2. Tap ...
+        3. See error
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "Device or browser, OS, and build or commit if known"
+    validations:
+      required: false

@@ -1,0 +1,79 @@
+name: "💡 Idea"
+description: "Propose a feature or improvement: your own idea, or one you're relaying from a partner, attendee, or your division."
+title: "[Idea] "
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea! Rough is fine; this issue is for discussing **whether** we want
+        it, not how to build it. What happens next: we discuss it here, and the outcome
+        (accepted / declined / parked) is posted in this thread. Accepted ideas get worked
+        out as a one-page sketch in the repo; you don't need to write that yourself.
+  - type: dropdown
+    id: source
+    attributes:
+      label: Who is this idea from?
+      options:
+        - Me / my division (core team)
+        - A partner (I'm relaying it)
+        - Attendee feedback (I'm relaying it)
+        - Somewhere else (say below)
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What's the idea?
+      description: One or two paragraphs. What should exist that doesn't today?
+      placeholder: "Digital food vouchers in the app: a time-stamped voucher you redeem once at the food stands ..."
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why is it worth building?
+      description: What problem does it solve, or what value does it add? Who asked for it?
+      placeholder: "The food queue was the biggest complaint last year ..."
+    validations:
+      required: true
+  - type: checkboxes
+    id: personas
+    attributes:
+      label: Who does it touch?
+      description: "Our three user groups: attendees (mobile app), partners (partner web platform), organizers & helpers (internal tools). Best guess is fine."
+      options:
+        - label: "Attendee (mobile app)"
+        - label: "Partner (partner platform)"
+        - label: "Organizer / helper (internal tools)"
+  - type: textarea
+    id: persona-roles
+    attributes:
+      label: What does each group do or see?
+      description: One rough line per group you checked. Optional; triage fills gaps.
+      placeholder: |
+        Attendee: sees their voucher, shows a QR code at the stand
+        Organizer: scans/devalues vouchers, sees redemption stats
+    validations:
+      required: false
+  - type: input
+    id: timing
+    attributes:
+      label: Any deadline or time context?
+      description: 'Optional, e.g. "partner wants this before opening day", "only useful if ready by conference".'
+    validations:
+      required: false
+  - type: input
+    id: contact
+    attributes:
+      label: Who should we keep in the loop?
+      description: "Optional: if you're relaying this, the original requester or their Q-Summit contact person."
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else?
+      description: Dependencies, similar things elsewhere, legal concerns. Optional.
+    validations:
+      required: false

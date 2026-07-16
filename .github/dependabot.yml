@@ -1,0 +1,20 @@
+# Keeps our pinned versions fresh. GitHub Actions are pinned to full commit
+# SHAs (house rule, see the workflows); Dependabot reads the trailing "# vX.Y.Z"
+# comment and opens a PR that bumps the SHA plus the comment together. Without
+# this, a SHA pin rots silently, which matters most for the CLA action that runs
+# with contents:write. The "npm" ecosystem also reads pnpm-lock.yaml and
+# covers the doc-tooling devDependencies.
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "ci"
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore"

@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "❓ Question about the project"
+    url: "https://github.com/Q-Summit/q-app/discussions"
+    about: "For questions that aren't ideas or bugs, use Discussions."
