@@ -28,21 +28,38 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+      # The third-party lychee step deliberately gets NO token. The empty
+      # string is load-bearing: the action's token input DEFAULTS to the job's
+      # GITHUB_TOKEN, which carries issues:write, more than a link checker
+      # needs. Unauthenticated github.com probes may hit rate limits;
+      # lychee.toml accepts 429 as healthy, so that never reads as link rot
+      # (a rate-limited link just goes unverified that week).
       - uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
         id: lychee
         with:
+          token: ""
           args: --config lychee.toml --no-progress './**/*.md'
           # Failure is reported as an issue below, not as a red workflow run.
           fail: false
-        env:
-          # Authenticated requests get higher rate limits on the many
-          # github.com links.
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: File an issue with the report
+      # One standing issue, updated in place: a persistently broken link must
+      # not open a duplicate every week. The lookup uses the List API (not
+      # Search, which is eventually consistent and could miss a fresh issue)
+      # and only matches issues authored by the workflow's own bot identity,
+      # so an outsider-opened issue with the same title can never capture the
+      # report. The bug label comes from scripts/setup-labels.sh. The report
+      # body derives from repo markdown, which lands via reviewed PRs.
+      - name: File or update the report issue
         if: steps.lychee.outputs.exit_code != 0
-        uses: peter-evans/create-issue-from-file@fca9117c27cdc29c6c4db3b86c48e4115a786710 # v6.0.0
-        with:
-          title: "Link check: broken external links"
-          content-filepath: ./lychee/out.md
-          # Only labels from scripts/setup-labels.sh exist; bug is the fit.
-          labels: bug
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          title="Link check: broken external links"
+          existing=$(gh api "repos/$GH_REPO/issues?state=open&labels=bug&creator=github-actions%5Bbot%5D&per_page=100" \
+            --jq "[.[] | select(.title == \"$title\")][0].number // empty")
+          if [ -n "$existing" ]; then
+            gh issue edit "$existing" --body-file ./lychee/out.md
+          else
+            gh issue create --title "$title" --label bug --body-file ./lychee/out.md
+          fi

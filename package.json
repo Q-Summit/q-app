@@ -6,7 +6,7 @@
   "type": "module",
   "description": "Q-Summit Conference App: docs-first repo tooling.",
   "engines": {
-    "node": ">=22",
+    "node": ">=22.18",
     "pnpm": ">=10"
   },
   "scripts": {

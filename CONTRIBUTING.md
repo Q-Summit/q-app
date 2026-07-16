@@ -48,13 +48,13 @@ A change is **done** when it works, is tested, and its docs are current.
 
 ## Development setup
 
-Day-to-day contributor tooling checks docs structure and style (`pnpm run check`). Application packages are added only behind accepted ADRs (see [`AGENTS.md`](./AGENTS.md)). You need Node 22+ and [pnpm](https://pnpm.io/installation) 10+ (easiest: `corepack enable pnpm`, which picks up the exact version pinned in `package.json`). Once, after cloning:
+Day-to-day contributor tooling checks docs structure and style (`pnpm run check`). Application packages are added only behind accepted ADRs (see [`AGENTS.md`](./AGENTS.md)). You need Node 22.18+ and [pnpm](https://pnpm.io/installation) 10+ (easiest: `corepack enable pnpm`, which picks up the exact version pinned in `package.json`). Once, after cloning:
 
 ```text
 pnpm run setup
 ```
 
-That installs the doc tooling (docs validator, markdownlint, cspell, prettier), points git at `.githooks/` so `pnpm run check` runs on every commit, creates/repairs the `.claude/skills → .agents/skills` symlink, and runs the **structural** docs check (`validate-docs`). It is not the full suite. Day to day and in CI, `pnpm run check` is the gate (validator + markdownlint + cspell + prettier). Windows: enable real symlink support (`git config core.symlinks true` plus Developer Mode) before cloning, then `pnpm run setup`. If a GUI Git client fails the hook with `pnpm: not found`, enable Corepack (`corepack enable`), use Node 22+ from `.nvmrc`, and ensure that Node's bin is on PATH.
+That installs the doc tooling (docs validator, markdownlint, cspell, prettier), points git at `.githooks/` so `pnpm run check` runs on every commit, creates/repairs the `.claude/skills → .agents/skills` symlink, and runs the **structural** docs check (`validate-docs`). It is not the full suite. Day to day and in CI, `pnpm run check` is the gate (validator + markdownlint + cspell + prettier). Windows: enable real symlink support (`git config core.symlinks true` plus Developer Mode) before cloning, then `pnpm run setup`. If a GUI Git client fails the hook with `pnpm: not found`, enable Corepack (`corepack enable`), use Node 22.18+ from `.nvmrc`, and ensure that Node's bin is on PATH.
 
 Coding agents follow [`AGENTS.md`](./AGENTS.md) ([agents.md](https://agents.md/) standard).
 

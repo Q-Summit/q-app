@@ -6,6 +6,9 @@ name: Checks
 # and an unfiltered workflow is safe to make a required status check.
 on:
   pull_request:
+    # "edited" included: PR titles and bodies become commit messages when the
+    # repo squash-merges, so a late title edit must re-run the style gate.
+    types: [opened, edited, reopened, synchronize]
   push:
     branches: [main]
     # Signature commits from the CLA bot never need a check run (see cla.yml).
@@ -28,6 +31,21 @@ jobs:
     name: Checks
     runs-on: ubuntu-latest
     steps:
+      # PR titles and bodies land in main's history under squash merges and
+      # are part of the project record either way; no file check ever sees
+      # them, so the no-dash rule is gated here. Untrusted text reaches the
+      # shell only via env vars, never template interpolation (zizmor rule).
+      - name: PR title and body follow house style
+        if: github.event_name == 'pull_request'
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          if printf '%s\n%s\n' "$TITLE" "$BODY" | grep -nE "$(printf '\342\200\223|\342\200\224')"; then
+            echo "::error::The PR title or body contains an em or en dash (house style, AGENTS.md); use a comma, colon, or parentheses."
+            exit 1
+          fi
       # Pinned to full commit SHAs (house rule for workflows, see cla.yml).
       # Update the SHA and the trailing version comment together.
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
