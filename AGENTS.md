@@ -6,7 +6,7 @@ Docs tree: [`docs/AGENTS.md`](docs/AGENTS.md). Process: [`docs/feature-workflow.
 
 ## Commands
 
-Node `>=22`, pnpm `>=10` (exact version pinned in `package.json` `packageManager`).
+Node `>=22.18`, pnpm `>=10` (exact version pinned in `package.json` `packageManager`).
 
 ```sh
 pnpm run setup      # clone: install, hooks, skills symlink, structural validate
