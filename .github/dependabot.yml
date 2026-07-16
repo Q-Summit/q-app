@@ -10,11 +10,17 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    # Wait before opening version-update PRs so freshly published malware or
+    # broken releases have time to surface. Security updates still open immediately.
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "ci"
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    cooldown:
+      default-days: 7
     commit-message:
       prefix: "chore"
