@@ -5,19 +5,26 @@
 # main branch and turns the PR check green. Later PRs pass automatically.
 # EVERYONE signs, including maintainers. No human is ever exempt.
 #
-# About the ONE bypass entry (read this, it is not a loophole):
+# About the CLA write bypass (read this, it is not a loophole):
 #   Signatures are stored on main, so the record is durable and versioned with
 #   the code. Because main requires pull requests, the CLA writer needs
 #   permission to commit the signatures file to main directly. Org policy
 #   blocks github-actions[bot] as a ruleset bypass, so we use the dedicated
-#   q-app-cla GitHub App instead. That App is the ONLY entry on main's bypass
-#   list. It lets the BOT write the signature ledger. It does NOT let any human
-#   merge without a PR, and it does NOT let anyone skip signing: every human is
-#   still gated by the required "CLA Assistant" check on every pull request.
+#   q-app-cla GitHub App instead. That App may push the signature ledger. It
+#   does NOT let anyone skip signing: every human is still gated by the
+#   required "CLA Assistant" check on every pull request.
 #
 # There are two separate lists; do not confuse them:
 #   - CLA allowlist (below): who may skip SIGNING. Bots only. No human, ever.
-#   - Branch bypass: who may push to main without a PR. Only q-app-cla.
+#   - Branch bypass: q-app-cla (always, for ledger writes). A lead may also
+#     have pull_request bypass to merge without waiting for review; that is
+#     unrelated to CLA signing.
+#
+# Comment policy (scripts/cla-comment-policy.mjs): stay silent when everyone
+# has already signed; when someone is missing, @-mention linked GitHub users
+# and list unlinked git authors. Best-effort only (continue-on-error): never
+# overturn a green CLA for a comment API blip. No in-progress or celebration
+# comments.
 #
 # Secrets (Repository Settings > Secrets and variables > Actions):
 #   - CLA_APP_ID: numeric App ID of q-app-cla
@@ -32,7 +39,8 @@
 #        - Require a pull request before merging.
 #        - Require status checks to pass, and add the "CLA Assistant" check
 #          (this is what blocks merging an unsigned PR).
-#        - Bypass list: add ONLY q-app-cla (Always allow). No human / no Admin.
+#        - Bypass list: q-app-cla (Always allow) for ledger writes. Optional:
+#          lead user with "pull requests only" to self-merge. No blanket Admin.
 #        - Do NOT enable "Require signed commits" (the bot's commits are unsigned
 #          and would be rejected).
 #   3. Any push-triggered workflow on main should set paths-ignore: ['cla/**']
@@ -88,6 +96,8 @@ jobs:
           permission-metadata: read
 
       - name: CLA Assistant
+        id: cla
+        continue-on-error: true
         if: >-
           (github.event_name == 'issue_comment' &&
             (github.event.comment.body == 'recheck' ||
@@ -103,31 +113,58 @@ jobs:
         with:
           # App token commits signatures to protected main (q-app-cla bypass).
           personal-access-token: ${{ steps.app-token.outputs.token }}
-          # Signatures are stored on the main branch, in cla/signatures.json, so
-          # the record is durable and versioned with the code and cannot be lost
-          # by deleting a branch. Seeded once; the App appends signers. See the
-          # header for the one App bypass this needs.
-          # path-to-signatures and branch are set explicitly (v3 defaults differ).
           path-to-signatures: "cla/signatures.json"
           branch: "main"
-          # The document contributors agree to.
           path-to-document: "https://github.com/Q-Summit/q-app/blob/main/CLA.md"
-          # Who may skip SIGNING: only automated bot accounts, which cannot post
-          # the signing comment. `*[bot]` matches every GitHub App account
-          # (brackets are illegal in human usernames). Never add a human here, so
-          # every maintainer and contributor signs.
+          # Who may skip SIGNING: only automated bot accounts. `*[bot]` matches
+          # every GitHub App account (brackets are illegal in human usernames).
           allowlist: "*[bot]"
+          # Intro only; scripts/cla-comment-policy.mjs rewrites with @-mentions.
           custom-notsigned-prcomment: |
-            Thank you for your contribution.
+            Before we can merge, every human committer must sign our
+            [Contributor License Agreement (CLA)]($pathToDocument).
+            You keep the copyright; signing lets Q-Summit keep the app free for
+            non-profits while offering commercial licenses. One-time step.
 
-            Before we can merge this, you need to sign our
-            [Contributor License Agreement (CLA)](https://github.com/Q-Summit/q-app/blob/main/CLA.md).
-            You keep the copyright to your work; signing lets Q-Summit keep the
-            app free for non-profits while offering commercial licenses. This
-            is a one-time step.
-
-            **To sign, reply to this PR with exactly:**
+            **Reply with exactly:**
           custom-pr-sign-comment: "I have read the CLA Document and I hereby sign the CLA"
-          custom-allsigned-prcomment: |
-            All contributors have signed the CLA. Thank you.
+          # Upstream always posts an "all signed" update; policy script deletes it.
+          custom-allsigned-prcomment: "."
           lock-pullrequest-aftermerge: false
+
+      # pull_request_target must not run PR-head code. Check out the default
+      # branch only so we run the trusted policy script from main.
+      - name: Checkout CLA comment policy
+        if: always() && steps.cla.outcome != 'skipped'
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          # Directory (not a single file): cone-mode sparse-checkout is reliable.
+          sparse-checkout: scripts
+          persist-credentials: false
+
+      - name: CLA comment policy
+        # Best-effort comment hygiene only. A green CLA must never be blocked by
+        # a transient API error while deleting or rewriting PR comments.
+        if: always() && steps.cla.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          CLA_OUTCOME: ${{ steps.cla.outcome }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          PATH_TO_DOCUMENT: https://github.com/Q-Summit/q-app/blob/main/CLA.md
+          SIGN_PHRASE: I have read the CLA Document and I hereby sign the CLA
+          # Must match pullRequestCommentContent.commentMarker for this workflow/job.
+          COMMENT_MARKER: "<!-- cla-lite-bot:cla:CLA Assistant:cla -->"
+        run: |
+          if [ ! -f scripts/cla-comment-policy.mjs ]; then
+            echo "policy script not on default branch yet; skipping"
+            exit 0
+          fi
+          node scripts/cla-comment-policy.mjs
+
+      - name: CLA must pass
+        if: steps.cla.outcome == 'failure'
+        run: |
+          echo "::error::CLA signature missing: see the bot comment for who must sign."
+          exit 1
