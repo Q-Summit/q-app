@@ -39,6 +39,10 @@
 #      so recording a signature never triggers a build.
 #   4. Never edit cla/signatures.json in a human PR (prettier-ignored; checks.yml
 #      fails the PR if the file appears in the diff). Only q-app-cla writes it.
+#   5. Comment policy (enforced by the "CLA comment policy" step below): stay
+#      silent when everyone has already signed; when someone is missing, ping
+#      them with @login. The upstream action always rewrites an "all signed"
+#      comment, so we delete that chatter on success.
 
 name: CLA Assistant
 
@@ -88,6 +92,8 @@ jobs:
           permission-metadata: read
 
       - name: CLA Assistant
+        id: cla
+        continue-on-error: true
         if: >-
           (github.event_name == 'issue_comment' &&
             (github.event.comment.body == 'recheck' ||
@@ -117,17 +123,155 @@ jobs:
           # (brackets are illegal in human usernames). Never add a human here, so
           # every maintainer and contributor signs.
           allowlist: "*[bot]"
+          # Intro only: the "CLA comment policy" step rewrites the body so
+          # missing signers are always @-mentioned (upstream only lists them
+          # when there are 2+ committers).
           custom-notsigned-prcomment: |
-            Thank you for your contribution.
+            Before we can merge, every human committer must sign our
+            [Contributor License Agreement (CLA)]($pathToDocument).
+            You keep the copyright; signing lets Q-Summit keep the app free for
+            non-profits while offering commercial licenses. One-time step.
 
-            Before we can merge this, you need to sign our
-            [Contributor License Agreement (CLA)](https://github.com/Q-Summit/q-app/blob/main/CLA.md).
-            You keep the copyright to your work; signing lets Q-Summit keep the
-            app free for non-profits while offering commercial licenses. This
-            is a one-time step.
-
-            **To sign, reply to this PR with exactly:**
+            **Reply with exactly:**
           custom-pr-sign-comment: "I have read the CLA Document and I hereby sign the CLA"
-          custom-allsigned-prcomment: |
-            All contributors have signed the CLA. Thank you.
+          # Upstream always posts an "all signed" update; we delete it below.
+          custom-allsigned-prcomment: "."
           lock-pullrequest-aftermerge: false
+
+      # Upstream CLA Assistant (a) skips creating a comment when everyone is
+      # already signed, but (b) rewrites any prior bot comment into an "all
+      # signed" celebration, and (c) only @-mentions unsigned committers when
+      # there are 2+. Enforce our policy: silence on success; @ping on failure.
+      - name: CLA comment policy
+        if: always() && steps.cla.outcome != 'skipped'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          CLA_OUTCOME: ${{ steps.cla.outcome }}
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          REPO: ${{ github.repository }}
+          PATH_TO_DOCUMENT: https://github.com/Q-Summit/q-app/blob/main/CLA.md
+          SIGN_PHRASE: I have read the CLA Document and I hereby sign the CLA
+          # Must match pullRequestCommentContent.commentMarker for this workflow/job.
+          COMMENT_MARKER: "<!-- cla-lite-bot:cla:CLA Assistant:cla -->"
+        run: |
+          python3 <<'PY'
+          import base64, json, os, subprocess, sys, urllib.parse
+
+          def gh_json(path: str):
+              out = subprocess.check_output(
+                  ["gh", "api", "--paginate", path], text=True
+              )
+              return json.loads(out)
+
+          def gh_send(method, path, body=None):
+              cmd = ["gh", "api", "-X", method, path]
+              if body is not None:
+                  cmd.extend(["--input", "-"])
+                  subprocess.check_call(
+                      cmd, input=json.dumps(body), text=True
+                  )
+              else:
+                  subprocess.check_call(cmd)
+
+          repo = os.environ["REPO"]
+          pr = os.environ["PR_NUMBER"]
+          outcome = os.environ["CLA_OUTCOME"]
+          marker = os.environ["COMMENT_MARKER"]
+          doc = os.environ["PATH_TO_DOCUMENT"]
+          phrase = os.environ["SIGN_PHRASE"]
+
+          comments = gh_json(f"repos/{repo}/issues/{pr}/comments")
+          ours = [
+              c
+              for c in comments
+              if isinstance(c.get("body"), str)
+              and (
+                  marker in c["body"]
+                  or "Self-Hosted CLA Assistant bot" in c["body"]
+              )
+          ]
+
+          if outcome == "success":
+              for c in ours:
+                  gh_send("DELETE", f"repos/{repo}/issues/comments/{c['id']}")
+              print(f"removed {len(ours)} all-signed CLA comment(s)")
+              sys.exit(0)
+
+          commits = gh_json(f"repos/{repo}/pulls/{pr}/commits")
+          logins: list[str] = []
+          seen: set[str] = set()
+          for commit in commits:
+              login = (commit.get("author") or {}).get("login")
+              if not login or login.endswith("[bot]") or login in seen:
+                  continue
+              seen.add(login)
+              logins.append(login)
+
+          sig_meta = gh_json(
+              f"repos/{repo}/contents/cla/signatures.json?ref=main"
+          )
+          sig = json.loads(base64.b64decode(sig_meta["content"]))
+          signed_ids = {
+              entry.get("id") for entry in sig.get("signedContributors", [])
+          }
+          signed_names = {
+              entry.get("name")
+              for entry in sig.get("signedContributors", [])
+              if entry.get("name")
+          }
+
+          unsigned: list[str] = []
+          for login in logins:
+              user = gh_json(f"users/{urllib.parse.quote(login)}")
+              if user["id"] in signed_ids or login in signed_names:
+                  continue
+              unsigned.append(login)
+
+          if not unsigned:
+              print("CLA failed without resolvable unsigned humans; leaving comments")
+              sys.exit(0)
+
+          mentions = " ".join(f"@{login}" for login in unsigned)
+          body = "\n".join(
+              [
+                  f"{mentions}: please sign the CLA before this can merge.",
+                  "",
+                  "Before we can merge, every human committer must sign our",
+                  f"[Contributor License Agreement (CLA)]({doc}).",
+                  "You keep the copyright; signing lets Q-Summit keep the app free for",
+                  "non-profits while offering commercial licenses. One-time step.",
+                  "",
+                  "**Reply with exactly:**",
+                  "- - -",
+                  phrase,
+                  "- - -",
+                  "<sub>You can retrigger this bot by commenting **recheck** in this Pull Request.</sub>",
+                  "<sub>Posted by the **Self-Hosted CLA Assistant bot**.</sub>",
+                  marker,
+              ]
+          )
+
+          if ours:
+              primary, *dupes = ours
+              gh_send(
+                  "PATCH",
+                  f"repos/{repo}/issues/comments/{primary['id']}",
+                  {"body": body},
+              )
+              for c in dupes:
+                  gh_send("DELETE", f"repos/{repo}/issues/comments/{c['id']}")
+              print(f"updated CLA ping for: {', '.join(unsigned)}")
+          else:
+              gh_send(
+                  "POST",
+                  f"repos/{repo}/issues/{pr}/comments",
+                  {"body": body},
+              )
+              print(f"created CLA ping for: {', '.join(unsigned)}")
+          PY
+
+      - name: CLA must pass
+        if: steps.cla.outcome == 'failure'
+        run: |
+          echo "::error::CLA signature missing: see the bot comment for who must sign."
+          exit 1
