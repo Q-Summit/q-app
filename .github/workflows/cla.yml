@@ -7,34 +7,38 @@
 #
 # About the ONE bypass entry (read this, it is not a loophole):
 #   Signatures are stored on main, so the record is durable and versioned with
-#   the code. Because main requires pull requests, the bot needs permission to
-#   commit the signatures file to main directly. So github-actions[bot] is the
-#   ONLY entry on main's "bypass required pull requests" list. That lets the BOT
-#   write the signature ledger. It does NOT let any human merge without a PR, and
-#   it does NOT let anyone skip signing: every human is still gated by the
-#   required "CLA Assistant" check on every pull request.
+#   the code. Because main requires pull requests, the CLA writer needs
+#   permission to commit the signatures file to main directly. Org policy
+#   blocks github-actions[bot] as a ruleset bypass, so we use the dedicated
+#   q-app-cla GitHub App instead. That App is the ONLY entry on main's bypass
+#   list. It lets the BOT write the signature ledger. It does NOT let any human
+#   merge without a PR, and it does NOT let anyone skip signing: every human is
+#   still gated by the required "CLA Assistant" check on every pull request.
 #
 # There are two separate lists; do not confuse them:
 #   - CLA allowlist (below): who may skip SIGNING. Bots only. No human, ever.
-#   - Branch bypass: who may push to main without a PR. Only github-actions[bot].
+#   - Branch bypass: who may push to main without a PR. Only q-app-cla.
+#
+# Secrets (Repository Settings > Secrets and variables > Actions):
+#   - CLA_APP_ID: numeric App ID of q-app-cla
+#   - CLA_APP_PRIVATE_KEY: contents of the App's .pem private key
 #
 # REQUIRED one-time GitHub settings (Repository Settings):
 #   1. Actions > General > Workflow permissions: keep the default at "Read
 #      repository contents and packages permissions" (read-only). This workflow
-#      does NOT rely on the repo-wide default; it declares its own permissions
-#      block below, which still grants the writes the bot needs. Leaving the
-#      default read-only means checks.yml and any future workflow get a
-#      least-privilege token unless they opt into more on purpose.
-#   2. Branches > rule for main:
+#      mints its own App token below for writes; other workflows stay least
+#      privilege unless they opt into more on purpose.
+#   2. Rules > ruleset for main:
 #        - Require a pull request before merging.
 #        - Require status checks to pass, and add the "CLA Assistant" check
 #          (this is what blocks merging an unsigned PR).
-#        - Allow specified actors to bypass required pull requests: add ONLY
-#          github-actions[bot]. No human.
+#        - Bypass list: add ONLY q-app-cla (Always allow). No human / no Admin.
 #        - Do NOT enable "Require signed commits" (the bot's commits are unsigned
 #          and would be rejected).
 #   3. Any push-triggered workflow on main should set paths-ignore: ['cla/**']
 #      so recording a signature never triggers a build.
+#   4. Never edit cla/signatures.json in a human PR (prettier-ignored; checks.yml
+#      fails the PR if the file appears in the diff). Only q-app-cla writes it.
 
 name: CLA Assistant
 
@@ -62,6 +66,27 @@ jobs:
   cla:
     runs-on: ubuntu-latest
     steps:
+      # Mint an installation token for q-app-cla so signature commits on main
+      # bypass the required-PR ruleset. Update SHA + version comment together.
+      - name: Create q-app-cla token
+        id: app-token
+        if: >-
+          (github.event_name == 'issue_comment' &&
+            (github.event.comment.body == 'recheck' ||
+             github.event.comment.body == 'I have read the CLA Document and I hereby sign the CLA')) ||
+          github.event_name == 'pull_request_target'
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.CLA_APP_ID }}
+          private-key: ${{ secrets.CLA_APP_PRIVATE_KEY }}
+          # Narrow below the App's installation defaults (zizmor github-app-token).
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-statuses: write
+          permission-metadata: read
+
       - name: CLA Assistant
         if: >-
           (github.event_name == 'issue_comment' &&
@@ -74,12 +99,14 @@ jobs:
         # Maintained fork of the archived contributor-assistant/github-action.
         uses: badideasforsale/cla-github-action@38936d31c921b8e536f5b786ea57c537b7cf297c # main
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
         with:
+          # App token commits signatures to protected main (q-app-cla bypass).
+          personal-access-token: ${{ steps.app-token.outputs.token }}
           # Signatures are stored on the main branch, in cla/signatures.json, so
           # the record is durable and versioned with the code and cannot be lost
-          # by deleting a branch. Created automatically on the first signature; do
-          # not create it by hand. See the header for the one bot bypass this needs.
+          # by deleting a branch. Seeded once; the App appends signers. See the
+          # header for the one App bypass this needs.
           # path-to-signatures and branch are set explicitly (v3 defaults differ).
           path-to-signatures: "cla/signatures.json"
           branch: "main"
