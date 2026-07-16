@@ -1,0 +1,14 @@
+#!/bin/sh
+# Q-App commit-msg hook: the no-dash rule (AGENTS.md, ALWAYS section) covers
+# commit messages too. The pattern is built via printf octal escapes (UTF-8
+# bytes of the en and em dash) so this file itself stays free of them.
+
+# -E (extended regex) so the plain "|" alternation is portable: GNU grep AND
+# the BSD grep shipped on macOS. Basic-regex "\|" is a GNU-only extension that
+# BSD grep treats literally, which would silently pass dashes on a Mac.
+if grep -nE "$(printf '\342\200\223|\342\200\224')" "$1"; then
+  echo "" >&2
+  echo "commit-msg: the message contains an em or en dash (lines above)." >&2
+  echo "House style bans them everywhere; use a comma, colon, or parentheses (see AGENTS.md)." >&2
+  exit 1
+fi

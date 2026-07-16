@@ -1,0 +1,13 @@
+#!/bin/sh
+# Q-App pre-commit hook: keeps docs structure and markdown style green.
+# Activate once per clone with: pnpm run hooks:install
+#
+# Runs the full, fast check suite (docs validator + markdownlint + cspell + prettier).
+# The whole run takes a few seconds, so there is no need to filter to
+# staged files; keeping it simple beats being clever here.
+
+pnpm run --silent check || {
+  echo "" >&2
+  echo "pre-commit: checks failed. Run 'pnpm run format', then fix any findings above." >&2
+  exit 1
+}
