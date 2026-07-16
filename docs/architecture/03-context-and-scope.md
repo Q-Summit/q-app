@@ -6,7 +6,7 @@
 
 ```mermaid
 flowchart LR
-  A([Attendee]) --> APP["Attendee app<br/>iOS/Android<br/>attendees only"]
+  A([Attendee]) --> APP["Attendee app<br/>Expo · iOS/Android<br/>attendees only"]
   P([Partner]) --> PW["Partner platform<br/>web<br/>partners only"]
   O([Organizer / helper]) --> ORG["Organizer tools<br/>web<br/>internal only"]
 
@@ -32,7 +32,7 @@ flowchart LR
   style platform fill:#f8fafc,stroke:#64748b,color:#1e293b
 ```
 
-_All three surfaces cross the shared API. Database, object storage, ticketing, and push are not decided deployments; each needs an ADR before first use. Dotted edges are external integration points, not part of the platform._
+_All three surfaces cross the shared API. The attendee app runtime is Expo ([ADR-0002](../decisions/0002-expo-attendee-mobile.md)). Database, object storage, ticketing, and push are not decided deployments; each needs an ADR before first use. Dotted edges are external integration points, not part of the platform._
 
 ## Scope notes
 

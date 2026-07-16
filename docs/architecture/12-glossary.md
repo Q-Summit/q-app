@@ -29,4 +29,5 @@ The terms the docs, issues, and sketches assume you know. Personas come first be
 
 | Term | Meaning |
 | --- | --- |
+| **Expo** | The decided runtime for the attendee mobile app (iOS/Android). See [ADR-0002](../decisions/0002-expo-attendee-mobile.md). Package layout still waits on the monorepo ADR. |
 | **Shared API** | The single backend all three surfaces talk to. Hosting choice is an owed ADR. |
