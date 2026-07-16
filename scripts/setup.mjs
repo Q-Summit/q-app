@@ -15,7 +15,12 @@ const bad = (msg) => {
 };
 
 // 1. Git hooks (pre-commit runs `pnpm run check`; CI re-runs it on the PR).
+//    Git silently ignores a nonexistent hooksPath, so verify the directory
+//    before claiming the hooks are active.
 try {
+  if (!fs.existsSync(path.join(root, '.githooks'))) {
+    throw new Error('.githooks/ is missing from the working tree');
+  }
   execFileSync('git', ['config', 'core.hooksPath', '.githooks'], { cwd: root });
   ok('git hooks active (core.hooksPath = .githooks)');
 } catch (e) {
@@ -29,6 +34,9 @@ const claudeDir = path.join(root, '.claude');
 const link = path.join(claudeDir, 'skills');
 const target = '../.agents/skills';
 fs.mkdirSync(claudeDir, { recursive: true });
+// This step's own blocker only: an earlier step failing (e.g. git hooks)
+// must not stop the symlink from being created or repaired.
+let skillsBlocked = false;
 let lst = null;
 try {
   lst = fs.lstatSync(link);
@@ -51,16 +59,23 @@ if (lst?.isSymbolicLink()) {
     fs.rmdirSync(link);
     lst = null;
   } else {
+    skillsBlocked = true;
     bad(
       `.claude/skills is a real directory with content (${entries.join(', ')}). ` +
         `Move those folders into .agents/skills/ yourself, then re-run pnpm run setup.`
     );
   }
 } else if (lst) {
+  skillsBlocked = true;
   bad(`.claude/skills exists but is neither a symlink nor a directory: remove it and re-run.`);
 }
-if (!lst && !failed) {
+if (!lst && !skillsBlocked) {
   try {
+    // Never leave a dangling link while reporting success: the target must
+    // exist before the symlink is worth creating.
+    if (!fs.existsSync(path.join(root, '.agents', 'skills'))) {
+      throw new Error('.agents/skills is missing from the working tree');
+    }
     fs.symlinkSync(target, link, 'dir');
     ok('.claude/skills → ../.agents/skills (created)');
   } catch (e) {
