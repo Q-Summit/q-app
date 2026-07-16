@@ -1,0 +1,50 @@
+name: Workflow lint
+
+# Lints and audits the GitHub Actions workflows themselves: actionlint for
+# correctness (expressions, event payloads, runner labels), zizmor for
+# security (unpinned actions, credential persistence, template injection,
+# dangerous triggers). Machine-enforces the house rules the workflow headers
+# state in prose. Path-filtered: runs only when workflow files change.
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - ".github/zizmor.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - ".github/zizmor.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: workflow-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to full commit SHAs (house rule for workflows, see cla.yml).
+      # Update the SHA and the trailing version comment together.
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: raven-actions/actionlint@3d39aea434753780c3b3d4a1a31c854b4dbf49d7 # v2.2.0
+  zizmor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # zizmor uploads its findings as SARIF to the code scanning tab.
+      security-events: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - uses: zizmorcore/zizmor-action@6599ee8b7a49aef6a770f63d261d214911a7ce02 # v0.6.0
+        with:
+          # Fork PRs get a read-only token that cannot upload SARIF; the audit
+          # still runs and fails the job on findings, it just skips the upload.
+          advanced-security: ${{ !github.event.pull_request.head.repo.fork }}

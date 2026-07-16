@@ -1,0 +1,8 @@
+# zizmor (workflow security audit) tuning. Read by workflow-lint.yml.
+rules:
+  dangerous-triggers:
+    ignore:
+      # cla.yml uses pull_request_target on purpose: the CLA bot must comment
+      # on and pass checks for fork PRs. It never checks out or runs PR code;
+      # the tradeoff is documented in the header of cla.yml.
+      - cla.yml
