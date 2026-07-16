@@ -36,7 +36,7 @@ Git hooks (installed by `pnpm run setup`) run `pnpm run check` plus a commit-mes
 - Branch names: `feat/`, `fix/`, `docs/`, `sketch/`, `adr/` ([`CONTRIBUTING.md`](CONTRIBUTING.md)).
 - Links over copying docs into new prose.
 - Obvious fake sample data (`user@example.com`).
-- TypeScript for new code. Direction (still needs ADRs before use): Expo mobile, Cloudflare Workers/Pages/R2, shared API (candidates in `docs/architecture/02-constraints.md`; each needs an ADR before use).
+- TypeScript for new code. Attendee mobile is Expo ([ADR-0002](docs/decisions/0002-expo-attendee-mobile.md)). Still candidates (ADR before use): Cloudflare Workers/Pages/R2, shared API host (`docs/architecture/02-constraints.md`).
 
 ## NEVER
 
