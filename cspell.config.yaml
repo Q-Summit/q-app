@@ -20,6 +20,8 @@ ignorePaths:
   - NOTICE
   # Symlink into .agents (checked via its real path).
   - .claude/skills
+  # CLA ledger is bot-owned on main; signer names are not project vocabulary.
+  - cla/signatures.json
 useGitignore: true
 words:
   - adrs

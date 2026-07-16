@@ -15,3 +15,7 @@ NOTICE
 
 # GitHub issue-form YAML is whitespace-sensitive; leave it to GitHub.
 .github/ISSUE_TEMPLATE
+
+# CLA ledger is append-only on main by q-app-cla. Never reformat in PRs:
+# prettier edits here race the bot and create perpetual merge conflicts.
+cla/signatures.json
