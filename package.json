@@ -20,7 +20,7 @@
     "hooks:install": "git config core.hooksPath .githooks"
   },
   "devDependencies": {
-    "cspell": "^10.0.1",
+    "cspell": "^10.3.3",
     "gray-matter": "^4.0.3",
     "markdownlint-cli2": "^0.23.0",
     "mdast-util-to-string": "^4.0.0",
